@@ -79,303 +79,331 @@ export default function Skills() {
     const canvas = canvasRef.current;
     if (!container || !canvas) return;
 
-    const W = container.offsetWidth;
-    const H = container.offsetHeight;
-    canvas.width = W;
-    canvas.height = H;
+    // ── init ─────────────────────────────────────────────────────────────────
+    const initScene = () => {
+      cancelAnimationFrame(animRef.current);
 
-    const cx = W / 2;
-    const cy = H / 2;
-    const RX = W * 0.43;
-    const RY = H * 0.41;
-    const IRX = RX - 8;
-    const IRY = RY - 8;
+      const W = container.offsetWidth;
+      const H = container.offsetHeight;
+      canvas.width  = W;
+      canvas.height = H;
 
-    const ctx = canvas.getContext("2d");
-    ctx.font = '400 11px "DM Mono", monospace';
+      // Responsive pill sizing
+      const isMobile = W < 600;
+      const FONT_SIZE = isMobile ? 9  : 11;
+      const PILL_PAD  = isMobile ? 14 : 24;
+      const PILL_H    = isMobile ? 17 : 22;
 
-    const pills = ALL_SKILLS.map((skill) => {
-      const tw = ctx.measureText(skill.name).width;
-      const pw = tw + 24;
-      const ph = 22;
-      const halfW = pw / 2;
-      const halfH = ph / 2;
-      const safeRX = IRX - halfW;
-      const safeRY = IRY - halfH;
+      const cx = W / 2;
+      const cy = H / 2;
+      const RX = W * 0.43;
+      const RY = H * 0.41;
+      const IRX = RX - 8;
+      const IRY = RY - 8;
 
-      let lx, ly;
-      do {
-        lx = rnd(-safeRX, safeRX);
-        ly = rnd(-safeRY, safeRY);
-      } while (!insideEllipse(lx, ly, safeRX * 0.95, safeRY * 0.95));
+      const ctx = canvas.getContext("2d");
+      ctx.font = `400 ${FONT_SIZE}px "DM Mono", monospace`;
 
-      return {
-        ...skill,
-        w: pw, h: ph,
-        lx, ly,
-        vx: rnd(-0.9, 0.9) || 0.5,   // faster spawn
-        vy: rnd(-0.9, 0.9) || 0.5,
-        bobOffset: rnd(0, Math.PI * 2),
-        bobSpeed: rnd(0.008, 0.018),
-        hovered: false,
-        sx: cx, sy: cy, pscale: 1, depth: 0,
+      const pills = ALL_SKILLS.map((skill) => {
+        const tw = ctx.measureText(skill.name).width;
+        const pw = tw + PILL_PAD;
+        const ph = PILL_H;
+        const halfW = pw / 2;
+        const halfH = ph / 2;
+        const safeRX = IRX - halfW;
+        const safeRY = IRY - halfH;
+
+        let lx, ly;
+        do {
+          lx = rnd(-safeRX, safeRX);
+          ly = rnd(-safeRY, safeRY);
+        } while (!insideEllipse(lx, ly, safeRX * 0.95, safeRY * 0.95));
+
+        return {
+          ...skill,
+          w: pw, h: ph,
+          lx, ly,
+          vx: rnd(-0.9, 0.9) || 0.5,
+          vy: rnd(-0.9, 0.9) || 0.5,
+          bobOffset: rnd(0, Math.PI * 2),
+          bobSpeed: rnd(0.008, 0.018),
+          hovered: false,
+          sx: cx, sy: cy, pscale: 1, depth: 0,
+          FONT_SIZE,
+        };
+      });
+
+      const state = {
+        pills,
+        tick: 0,
+        rotAngle: 0,
+        tiltAngle: 0,
+        tiltDir: 1,
+        W, H, cx, cy, RX, RY, IRX, IRY,
+        FONT_SIZE,
       };
-    });
+      stateRef.current = state;
 
-    const state = {
-      pills,
-      tick: 0,
-      rotAngle: 0,
-      tiltAngle: 0,
-      tiltDir: 1,
-    };
-    stateRef.current = state;
+      // ── physics helpers ──────────────────────────────────────────────────
+      function bounceInsideEllipse(p) {
+        const halfW = p.w / 2;
+        const halfH = p.h / 2;
+        const safeRX = IRX - halfW - 1;
+        const safeRY = IRY - halfH - 1;
+        if (safeRX <= 0 || safeRY <= 0) return;
 
-    function bounceInsideEllipse(p) {
-      const halfW = p.w / 2;
-      const halfH = p.h / 2;
-      const safeRX = IRX - halfW - 1;
-      const safeRY = IRY - halfH - 1;
-      if (safeRX <= 0 || safeRY <= 0) return;
+        const norm = (p.lx * p.lx) / (safeRX * safeRX) + (p.ly * p.ly) / (safeRY * safeRY);
+        if (norm >= 1) {
+          const nx = p.lx / (safeRX * safeRX);
+          const ny = p.ly / (safeRY * safeRY);
+          const nlen = Math.sqrt(nx * nx + ny * ny) || 1;
+          const nnx = nx / nlen;
+          const nny = ny / nlen;
 
-      const norm = (p.lx * p.lx) / (safeRX * safeRX) + (p.ly * p.ly) / (safeRY * safeRY);
-      if (norm >= 1) {
-        const nx = (p.lx / (safeRX * safeRX));
-        const ny = (p.ly / (safeRY * safeRY));
-        const nlen = Math.sqrt(nx * nx + ny * ny) || 1;
-        const nnx = nx / nlen;
-        const nny = ny / nlen;
+          const scale = 0.995 / Math.sqrt(norm);
+          p.lx *= scale;
+          p.ly *= scale;
 
-        // gentler push back — 0.995 instead of 0.97
-        const scale = 0.995 / Math.sqrt(norm);
-        p.lx *= scale;
-        p.ly *= scale;
-
-        const dot = p.vx * nnx + p.vy * nny;
-        if (dot > 0) {
-          p.vx -= 2 * dot * nnx * 0.75;
-          p.vy -= 2 * dot * nny * 0.75;
-        }
-      }
-    }
-
-    function draw() {
-      ctx.clearRect(0, 0, W, H);
-      state.tick++;
-      const t = state.tick;
-
-      state.rotAngle += 0.004;
-      state.tiltAngle += 0.0015 * state.tiltDir;
-      if (Math.abs(state.tiltAngle) > 0.38) state.tiltDir *= -1;
-
-      const tilt = state.tiltAngle;
-      const cosTilt = Math.cos(tilt);
-      const sinTilt = Math.sin(tilt);
-
-      // Move pills — smoother physics
-      for (const p of state.pills) {
-        if (p.hovered) continue;
-
-        // stronger bob for more fluid motion
-        p.vy += Math.sin(t * p.bobSpeed + p.bobOffset) * 0.008;
-        p.vx += Math.cos(t * p.bobSpeed * 0.8 + p.bobOffset) * 0.005;
-
-        p.lx += p.vx;
-        p.ly += p.vy;
-
-        // less damping — pills keep momentum longer
-        p.vx *= 0.9995;
-        p.vy *= 0.9995;
-
-        // higher minimum speed so pills never stall
-        const spd = Math.hypot(p.vx, p.vy);
-        if (spd < 0.4) {
-          const a = Math.random() * Math.PI * 2;
-          p.vx += Math.cos(a) * 0.35;
-          p.vy += Math.sin(a) * 0.35;
-        }
-
-        bounceInsideEllipse(p);
-      }
-
-      // Pill-pill collision — softer pushes
-      for (let i = 0; i < state.pills.length; i++) {
-        for (let j = i + 1; j < state.pills.length; j++) {
-          const a = state.pills[i], b = state.pills[j];
-          const dx = b.lx - a.lx;
-          const dy = b.ly - a.ly;
-          const minX = (a.w + b.w) / 2 + 4;
-          const minY = (a.h + b.h) / 2 + 4;
-          if (Math.abs(dx) < minX && Math.abs(dy) < minY) {
-            const ox = minX - Math.abs(dx);
-            const oy = minY - Math.abs(dy);
-            let nx, ny;
-            if (ox < oy) { nx = Math.sign(dx); ny = 0; }
-            else         { nx = 0; ny = Math.sign(dy); }
-
-            // softer push — 0.3 instead of 0.5
-            const push = Math.min(ox, oy) * 0.3;
-            if (!a.hovered) { a.lx -= nx * push; a.ly -= ny * push; bounceInsideEllipse(a); }
-            if (!b.hovered) { b.lx += nx * push; b.ly += ny * push; bounceInsideEllipse(b); }
-
-            const rv = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
-            if (rv < 0) {
-              // softer impulse — 0.4 instead of 0.55
-              const imp = rv * 0.4;
-              if (!a.hovered) { a.vx += imp * nx; a.vy += imp * ny; }
-              if (!b.hovered) { b.vx -= imp * nx; b.vy -= imp * ny; }
-            }
+          const dot = p.vx * nnx + p.vy * nny;
+          if (dot > 0) {
+            p.vx -= 2 * dot * nnx * 0.75;
+            p.vy -= 2 * dot * nny * 0.75;
           }
         }
       }
 
-      // Project pills to screen via tilt
-      for (const p of state.pills) {
-        const sy_tilted = p.ly * cosTilt;
-        const sz = p.ly * sinTilt;
-        const fov = 3.8;
-        const scale = fov / (fov + sz / Math.max(RY, 1));
-        p.sx = cx + p.lx * scale;
-        p.sy = cy + sy_tilted * scale;
-        p.depth = sz;
-        p.pscale = scale;
-      }
+      // ── draw loop ────────────────────────────────────────────────────────
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+        state.tick++;
+        const t = state.tick;
 
-      // ── DRAW GLOBE ──────────────────────────────
+        state.rotAngle  += 0.004;
+        state.tiltAngle += 0.0015 * state.tiltDir;
+        if (Math.abs(state.tiltAngle) > 0.38) state.tiltDir *= -1;
 
-      for (let i = 4; i >= 1; i--) {
-        ctx.beginPath();
-        ctx.ellipse(cx, cy, RX + i * 10, RY + i * 8, 0, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(200,20,20,${0.055 - i * 0.011})`;
-        ctx.lineWidth = 8;
-        ctx.stroke();
-      }
+        const tilt    = state.tiltAngle;
+        const cosTilt = Math.cos(tilt);
+        const sinTilt = Math.sin(tilt);
 
-      const grd = ctx.createRadialGradient(cx - RX * 0.22, cy - RY * 0.22, 8, cx, cy, Math.max(RX, RY) * 1.05);
-      grd.addColorStop(0,    "rgba(32,5,5,0.95)");
-      grd.addColorStop(0.5,  "rgba(14,3,3,0.91)");
-      grd.addColorStop(1,    "rgba(4,1,1,0.97)");
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, RX, RY, 0, 0, Math.PI * 2);
-      ctx.fillStyle = grd;
-      ctx.fill();
+        // Move pills
+        for (const p of state.pills) {
+          if (p.hovered) continue;
 
-      // Grid lines clipped inside globe
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, RX - 1, RY - 1, 0, 0, Math.PI * 2);
-      ctx.clip();
-      ctx.globalAlpha = 0.07;
+          p.vy += Math.sin(t * p.bobSpeed + p.bobOffset) * 0.008;
+          p.vx += Math.cos(t * p.bobSpeed * 0.8 + p.bobOffset) * 0.005;
 
-      for (let i = 1; i <= 5; i++) {
-        const ratio = (i / 6) * 2 - 1;
-        const latY = cy + ratio * RY * cosTilt;
-        const latRX = RX * Math.sqrt(Math.max(0, 1 - ratio * ratio));
-        const latRY = Math.max(1, latRX * 0.2 * Math.abs(cosTilt));
-        ctx.beginPath();
-        ctx.ellipse(cx, latY, latRX, latRY, 0, 0, Math.PI * 2);
-        ctx.strokeStyle = "#ff2222";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
+          p.lx += p.vx;
+          p.ly += p.vy;
 
-      for (let i = 0; i < 8; i++) {
-        const angle = state.rotAngle + (Math.PI * i) / 8;
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(angle);
-        ctx.beginPath();
-        ctx.ellipse(0, 0, RX * 0.15, RY, 0, 0, Math.PI * 2);
-        ctx.strokeStyle = "#ff2222";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        ctx.restore();
-      }
+          p.vx *= 0.9995;
+          p.vy *= 0.9995;
 
-      ctx.restore();
-      ctx.globalAlpha = 1;
+          const spd = Math.hypot(p.vx, p.vy);
+          if (spd < 0.4) {
+            const a = Math.random() * Math.PI * 2;
+            p.vx += Math.cos(a) * 0.35;
+            p.vy += Math.sin(a) * 0.35;
+          }
 
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, RX, RY, 0, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(210,30,30,0.7)";
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.ellipse(cx - RX * 0.18, cy - RY * 0.2, RX * 0.48, RY * 0.32, -0.2, Math.PI * 1.1, Math.PI * 1.75);
-      ctx.strokeStyle = "rgba(255,255,255,0.06)";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      // ── CLIP PILLS TO GLOBE ──────────────────────
-      ctx.save();
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, RX - 1, RY - 1, 0, 0, Math.PI * 2);
-      ctx.clip();
-
-      const sorted = [...state.pills].sort((a, b) => (a.depth || 0) - (b.depth || 0));
-
-      for (const p of sorted) {
-        const col = CAT_COLORS[p.cat] || CAT_COLORS.Tools;
-        const isHov = p.hovered;
-        const s = Math.max(0.6, Math.min(1.15, p.pscale || 1));
-        const pw = p.w * s;
-        const ph = p.h * s;
-        const r = ph / 2;
-        const x = p.sx - pw / 2;
-        const y = p.sy - ph / 2;
-
-        const depthAlpha = Math.min(1, 0.38 + ((p.depth || 0) / RY + 1) * 0.32);
-
-        ctx.save();
-        ctx.globalAlpha = isHov ? 1 : depthAlpha;
-
-        if (isHov) {
-          ctx.shadowColor = "rgba(230,50,50,0.9)";
-          ctx.shadowBlur = 20;
+          bounceInsideEllipse(p);
         }
 
+        // Pill-pill collision
+        for (let i = 0; i < state.pills.length; i++) {
+          for (let j = i + 1; j < state.pills.length; j++) {
+            const a = state.pills[i], b = state.pills[j];
+            const dx = b.lx - a.lx;
+            const dy = b.ly - a.ly;
+            const minX = (a.w + b.w) / 2 + 4;
+            const minY = (a.h + b.h) / 2 + 4;
+            if (Math.abs(dx) < minX && Math.abs(dy) < minY) {
+              const ox = minX - Math.abs(dx);
+              const oy = minY - Math.abs(dy);
+              let nx, ny;
+              if (ox < oy) { nx = Math.sign(dx); ny = 0; }
+              else         { nx = 0; ny = Math.sign(dy); }
+
+              const push = Math.min(ox, oy) * 0.3;
+              if (!a.hovered) { a.lx -= nx * push; a.ly -= ny * push; bounceInsideEllipse(a); }
+              if (!b.hovered) { b.lx += nx * push; b.ly += ny * push; bounceInsideEllipse(b); }
+
+              const rv = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+              if (rv < 0) {
+                const imp = rv * 0.4;
+                if (!a.hovered) { a.vx += imp * nx; a.vy += imp * ny; }
+                if (!b.hovered) { b.vx -= imp * nx; b.vy -= imp * ny; }
+              }
+            }
+          }
+        }
+
+        // Project to screen via tilt
+        for (const p of state.pills) {
+          const sy_tilted = p.ly * cosTilt;
+          const sz = p.ly * sinTilt;
+          const fov = 3.8;
+          const scale = fov / (fov + sz / Math.max(RY, 1));
+          p.sx    = cx + p.lx * scale;
+          p.sy    = cy + sy_tilted * scale;
+          p.depth = sz;
+          p.pscale = scale;
+        }
+
+        // ── Draw globe ───────────────────────────────────────────────────
+
+        for (let i = 4; i >= 1; i--) {
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, RX + i * 10, RY + i * 8, 0, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(200,20,20,${0.055 - i * 0.011})`;
+          ctx.lineWidth = 8;
+          ctx.stroke();
+        }
+
+        const grd = ctx.createRadialGradient(
+          cx - RX * 0.22, cy - RY * 0.22, 8,
+          cx, cy, Math.max(RX, RY) * 1.05
+        );
+        grd.addColorStop(0,   "rgba(32,5,5,0.95)");
+        grd.addColorStop(0.5, "rgba(14,3,3,0.91)");
+        grd.addColorStop(1,   "rgba(4,1,1,0.97)");
         ctx.beginPath();
-        ctx.roundRect(x, y, pw, ph, r);
-        ctx.fillStyle = isHov ? "rgba(45,6,6,1)" : col.bg;
+        ctx.ellipse(cx, cy, RX, RY, 0, 0, Math.PI * 2);
+        ctx.fillStyle = grd;
         ctx.fill();
 
+        // Grid lines clipped inside globe
+        ctx.save();
         ctx.beginPath();
-        ctx.roundRect(x, y, pw, ph, r);
-        ctx.strokeStyle = isHov ? "#ff3333" : col.border;
-        ctx.lineWidth = isHov ? 1.5 : Math.max(0.6, s * 0.9);
-        ctx.stroke();
+        ctx.ellipse(cx, cy, RX - 1, RY - 1, 0, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.globalAlpha = 0.07;
 
-        ctx.shadowBlur = 0;
+        for (let i = 1; i <= 5; i++) {
+          const ratio  = (i / 6) * 2 - 1;
+          const latY   = cy + ratio * RY * cosTilt;
+          const latRX  = RX * Math.sqrt(Math.max(0, 1 - ratio * ratio));
+          const latRY  = Math.max(1, latRX * 0.2 * Math.abs(cosTilt));
+          ctx.beginPath();
+          ctx.ellipse(cx, latY, latRX, latRY, 0, 0, Math.PI * 2);
+          ctx.strokeStyle = "#ff2222";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
 
-        const fontSize = Math.max(8, Math.round(11 * s));
-        ctx.font = `400 ${fontSize}px "DM Mono", monospace`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillStyle = isHov ? "#ffffff" : col.text;
-        ctx.fillText(p.name, p.sx, p.sy);
+        for (let i = 0; i < 8; i++) {
+          const angle = state.rotAngle + (Math.PI * i) / 8;
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(angle);
+          ctx.beginPath();
+          ctx.ellipse(0, 0, RX * 0.15, RY, 0, 0, Math.PI * 2);
+          ctx.strokeStyle = "#ff2222";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.restore();
+        }
 
         ctx.restore();
+        ctx.globalAlpha = 1;
+
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, RX, RY, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(210,30,30,0.7)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.ellipse(
+          cx - RX * 0.18, cy - RY * 0.2,
+          RX * 0.48, RY * 0.32,
+          -0.2, Math.PI * 1.1, Math.PI * 1.75
+        );
+        ctx.strokeStyle = "rgba(255,255,255,0.06)";
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // ── Clip pills to globe ──────────────────────────────────────────
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, RX - 1, RY - 1, 0, 0, Math.PI * 2);
+        ctx.clip();
+
+        const sorted = [...state.pills].sort((a, b) => (a.depth || 0) - (b.depth || 0));
+
+        for (const p of sorted) {
+          const col   = CAT_COLORS[p.cat] || CAT_COLORS.Tools;
+          const isHov = p.hovered;
+          const s     = Math.max(0.6, Math.min(1.15, p.pscale || 1));
+          const pw    = p.w * s;
+          const ph    = p.h * s;
+          const r     = ph / 2;
+          const x     = p.sx - pw / 2;
+          const y     = p.sy - ph / 2;
+
+          const depthAlpha = Math.min(1, 0.38 + ((p.depth || 0) / RY + 1) * 0.32);
+
+          ctx.save();
+          ctx.globalAlpha = isHov ? 1 : depthAlpha;
+
+          if (isHov) {
+            ctx.shadowColor = "rgba(230,50,50,0.9)";
+            ctx.shadowBlur  = 20;
+          }
+
+          ctx.beginPath();
+          ctx.roundRect(x, y, pw, ph, r);
+          ctx.fillStyle = isHov ? "rgba(45,6,6,1)" : col.bg;
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.roundRect(x, y, pw, ph, r);
+          ctx.strokeStyle = isHov ? "#ff3333" : col.border;
+          ctx.lineWidth   = isHov ? 1.5 : Math.max(0.6, s * 0.9);
+          ctx.stroke();
+
+          ctx.shadowBlur = 0;
+
+          const fontSize = Math.max(7, Math.round(p.FONT_SIZE * s));
+          ctx.font         = `400 ${fontSize}px "DM Mono", monospace`;
+          ctx.textAlign    = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle    = isHov ? "#ffffff" : col.text;
+          ctx.fillText(p.name, p.sx, p.sy);
+
+          ctx.restore();
+        }
+
+        ctx.restore();
+
+        animRef.current = requestAnimationFrame(draw);
       }
 
-      ctx.restore();
+      draw();
+    };
 
-      animRef.current = requestAnimationFrame(draw);
-    }
-
-    draw();
-
-    const onMove = (e) => {
+    // ── Event helpers ─────────────────────────────────────────────────────
+    const getCanvasXY = (clientX, clientY) => {
       const rect = canvas.getBoundingClientRect();
-      const mx = (e.clientX - rect.left) * (W / rect.width);
-      const my = (e.clientY - rect.top) * (H / rect.height);
+      const W    = stateRef.current?.W || canvas.width;
+      const H    = stateRef.current?.H || canvas.height;
+      return {
+        mx: (clientX - rect.left) * (W / rect.width),
+        my: (clientY - rect.top)  * (H / rect.height),
+      };
+    };
+
+    const handleHover = (clientX, clientY) => {
+      if (!stateRef.current) return;
+      const { mx, my } = getCanvasXY(clientX, clientY);
       let found = null;
       for (const p of stateRef.current.pills) {
-        const s = Math.max(0.6, Math.min(1.15, p.pscale || 1));
+        const s  = Math.max(0.6, Math.min(1.15, p.pscale || 1));
         const pw = p.w * s;
         const ph = p.h * s;
-        const hit = mx >= p.sx - pw / 2 && mx <= p.sx + pw / 2 &&
-                    my >= p.sy - ph / 2 && my <= p.sy + ph / 2;
+        const hit =
+          mx >= p.sx - pw / 2 && mx <= p.sx + pw / 2 &&
+          my >= p.sy - ph / 2 && my <= p.sy + ph / 2;
         p.hovered = hit;
         if (hit) found = p.name;
       }
@@ -383,21 +411,16 @@ export default function Skills() {
       canvas.style.cursor = found ? "pointer" : "default";
     };
 
-    const onLeave = () => {
-      for (const p of stateRef.current.pills) p.hovered = false;
-      setHovered(null);
-    };
-
-    const onClick = (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const mx = (e.clientX - rect.left) * (W / rect.width);
-      const my = (e.clientY - rect.top) * (H / rect.height);
+    const handleScatter = (clientX, clientY) => {
+      if (!stateRef.current) return;
+      const { mx, my } = getCanvasXY(clientX, clientY);
       for (const p of stateRef.current.pills) {
-        const s = Math.max(0.6, Math.min(1.15, p.pscale || 1));
+        const s  = Math.max(0.6, Math.min(1.15, p.pscale || 1));
         const pw = p.w * s;
         const ph = p.h * s;
-        const hit = mx >= p.sx - pw / 2 && mx <= p.sx + pw / 2 &&
-                    my >= p.sy - ph / 2 && my <= p.sy + ph / 2;
+        const hit =
+          mx >= p.sx - pw / 2 && mx <= p.sx + pw / 2 &&
+          my >= p.sy - ph / 2 && my <= p.sy + ph / 2;
         if (hit) {
           const a = Math.random() * Math.PI * 2;
           p.vx = Math.cos(a) * 4;
@@ -406,15 +429,51 @@ export default function Skills() {
       }
     };
 
-    canvas.addEventListener("mousemove", onMove);
+    const onLeave = () => {
+      if (!stateRef.current) return;
+      for (const p of stateRef.current.pills) p.hovered = false;
+      setHovered(null);
+    };
+
+    // Mouse events
+    const onMouseMove  = (e) => handleHover(e.clientX, e.clientY);
+    const onMouseClick = (e) => handleScatter(e.clientX, e.clientY);
+
+    // Touch events
+    const onTouchMove = (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      handleHover(touch.clientX, touch.clientY);
+    };
+    const onTouchEnd = (e) => {
+      const touch = e.changedTouches[0];
+      handleScatter(touch.clientX, touch.clientY);
+      onLeave();
+    };
+
+    canvas.addEventListener("mousemove",  onMouseMove);
     canvas.addEventListener("mouseleave", onLeave);
-    canvas.addEventListener("click", onClick);
+    canvas.addEventListener("click",      onMouseClick);
+    canvas.addEventListener("touchmove",  onTouchMove, { passive: false });
+    canvas.addEventListener("touchend",   onTouchEnd);
+
+    // ── ResizeObserver — re-init on container size change ─────────────────
+    const ro = new ResizeObserver(() => {
+      initScene();
+    });
+    ro.observe(container);
+
+    // Initial run
+    initScene();
 
     return () => {
       cancelAnimationFrame(animRef.current);
-      canvas.removeEventListener("mousemove", onMove);
+      ro.disconnect();
+      canvas.removeEventListener("mousemove",  onMouseMove);
       canvas.removeEventListener("mouseleave", onLeave);
-      canvas.removeEventListener("click", onClick);
+      canvas.removeEventListener("click",      onMouseClick);
+      canvas.removeEventListener("touchmove",  onTouchMove);
+      canvas.removeEventListener("touchend",   onTouchEnd);
     };
   }, []);
 
@@ -433,8 +492,11 @@ export default function Skills() {
 
       <div className="skills-legend">
         {Object.entries(CAT_COLORS).map(([cat, col]) => (
-          <span key={cat} className="legend-item"
-            style={{ color: col.text, borderColor: col.border, background: col.bg }}>
+          <span
+            key={cat}
+            className="legend-item"
+            style={{ color: col.text, borderColor: col.border, background: col.bg }}
+          >
             <span className="legend-dot" style={{ background: col.border }} />
             {cat}
           </span>

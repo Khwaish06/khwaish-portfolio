@@ -39,10 +39,13 @@
   letter-spacing: 0.14em;
 }
 
+/* ── Arena ───────────────────────────────────────────────────────────────── */
+
 .skills-arena {
   position: relative;
   width: 100%;
   max-width: 1100px;
+  /* Desktop default */
   height: 480px;
 }
 
@@ -50,7 +53,10 @@
   width: 100%;
   height: 100%;
   display: block;
+  touch-action: none; /* prevents scroll interference on touch */
 }
+
+/* ── Tooltip ─────────────────────────────────────────────────────────────── */
 
 .skills-tooltip {
   position: absolute;
@@ -71,6 +77,8 @@
   z-index: 10;
 }
 
+/* ── Legend ──────────────────────────────────────────────────────────────── */
+
 .skills-legend {
   display: flex;
   flex-wrap: wrap;
@@ -90,6 +98,7 @@
   padding: 5px 12px;
   border-radius: 20px;
   border: 1px solid;
+  user-select: none;
 }
 
 .legend-dot {
@@ -99,18 +108,68 @@
   flex-shrink: 0;
 }
 
+/* ── Responsive breakpoints ──────────────────────────────────────────────── */
+
+/* Tablet */
+@media (max-width: 900px) {
+  .skills-arena {
+    height: 440px;
+  }
+  .skills-section {
+    padding: 70px 24px 50px;
+  }
+}
+
+/* Large mobile */
 @media (max-width: 768px) {
-  .skills-arena { height: 360px; }
-  .skills-section { padding: 60px 20px 40px; }
-  .skills-legend { gap: 8px; }
+  .skills-arena {
+    height: 420px;   /* was 360 — pills need room to breathe */
+  }
+  .skills-section {
+    padding: 60px 16px 40px;
+    gap: 28px;
+  }
+  .skills-legend {
+    gap: 8px;
+  }
 }
 
+/* Medium mobile */
+@media (max-width: 600px) {
+  .skills-arena {
+    height: 390px;
+  }
+  .skills-subheading {
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+  }
+}
+
+/* Small mobile */
 @media (max-width: 480px) {
-  .skills-arena { height: 300px; }
-  .legend-item { font-size: 0.55rem; padding: 4px 9px; }
+  .skills-arena {
+    height: 360px;   /* was 300 — give pills enough vertical space */
+  }
+  .skills-section {
+    padding: 50px 12px 32px;
+    gap: 22px;
+  }
+  .legend-item {
+    font-size: 0.55rem;
+    padding: 4px 9px;
+  }
 }
 
+/* Very small mobile */
 @media (max-width: 400px) {
-  .skills-arena { height: 260px; }
-  .skills-legend { display: none; }
+  .skills-arena {
+    height: 320px;   /* was 260 */
+  }
+  .skills-section {
+    padding: 44px 10px 28px;
+  }
+  /* Hide legend on very small screens to save space */
+  .skills-legend {
+    display: none;
+  }
 }
