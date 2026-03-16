@@ -1,0 +1,55 @@
+.intro-container{
+  height:100vh;
+  background:black;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+}
+
+.k-logo{
+  position:relative;
+  width:160px;
+  height:200px;
+}
+
+/* all bars */
+.bar{
+  position:absolute;
+  background:#e50914;
+  box-shadow:0 0 25px rgba(229,9,20,0.7);
+}
+
+/* vertical bar */
+.vertical{
+  width:30px;
+  height:200px;
+  left:0;
+}
+
+/* upper diagonal */
+.diag-top{
+  width:30px;
+  height:110px;
+  left:20px;
+  top:95px;
+  transform:rotate(-45deg);
+  transform-origin:left bottom;
+}
+
+/* lower diagonal */
+.diag-bottom{
+  width:30px;
+  height:110px;
+  left:20px;
+  top:95px;
+  transform:rotate(45deg);
+  transform-origin:left top;
+}
+
+.name{
+  color:white;
+  font-size:40px;
+  margin-top:30px;
+  letter-spacing:4px;
+}

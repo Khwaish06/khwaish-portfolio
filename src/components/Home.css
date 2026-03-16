@@ -1,0 +1,144 @@
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,600&family=DM+Mono:wght@300;400&display=swap");
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding-bottom: 80px;
+  background: #080808;
+  min-height: 100vh;
+}
+
+.video-wrapper {
+  position: relative;
+  width: 100%;
+  line-height: 0;
+}
+
+.hero-video {
+  width: 100%;
+  height: 85vh;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+  border-radius: 0 0 32px 32px;
+  filter: brightness(0.92);
+  animation: videoSlowIn 1s ease both;
+}
+
+@keyframes videoSlowIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.video-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 45%;
+  background: linear-gradient(to bottom, transparent, #080808);
+  border-radius: 0 0 32px 32px;
+  pointer-events: none;
+}
+
+.hero-content {
+  width: 100%;
+  padding: 52px 60px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 20px;
+  animation: contentRise 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 0.3s;
+}
+
+@keyframes contentRise {
+  from { opacity: 0; transform: translateY(36px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.about-label {
+  font-family: "DM Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 400;
+  letter-spacing: 0.28em;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  text-align: left;
+}
+
+.about-heading {
+  font-family: "Cormorant Garamond", serif;
+  font-size: clamp(2.6rem, 6.5vw, 4.4rem);
+  font-weight: 300;
+  line-height: 1.1;
+  color: #ffffff;
+  margin: 0;
+  text-align: left;
+}
+
+.name-highlight {
+  font-style: italic;
+  font-weight: 600;
+  color: #e63232;
+  position: relative;
+}
+
+.name-highlight::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -4px;
+  height: 2px;
+  background: linear-gradient(90deg, #e63232, transparent);
+  opacity: 0.6;
+}
+
+.about-text {
+  font-family: "DM Mono", monospace;
+  font-size: clamp(0.82rem, 1.8vw, 0.95rem);
+  line-height: 2;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 300;
+  max-width: 660px;
+  min-height: 5.5em;
+  text-align: left;
+}
+
+.cursor {
+  display: inline-block;
+  color: #e63232;
+  font-weight: 300;
+  animation: blink 0.75s step-end infinite;
+  margin-left: 1px;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
+@media (max-width: 768px) {
+  .hero-content {
+    padding: 40px 32px 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .hero-video {
+    height: 50vh;
+    border-radius: 0 0 20px 20px;
+    object-position: center center;
+  }
+  .hero-content {
+    padding: 32px 20px 0;
+  }
+  .about-heading {
+    font-size: clamp(1.8rem, 6vw, 2.6rem);
+  }
+  .about-text {
+    font-size: 0.82rem;
+    min-height: 7em;
+  }
+}
